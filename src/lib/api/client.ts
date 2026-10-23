@@ -40,17 +40,16 @@ export class ApiError extends Error {
 }
 
 function getApiBaseUrl(): string {
-  const rawValue = process.env.NEXT_PUBLIC_API_URL;
-
-  if (!rawValue) {
-    throw new Error('Missing NEXT_PUBLIC_API_URL. Set it in .env.local.');
-  }
+  const rawValue =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    'http://localhost:8080';
 
   return rawValue.replace(/\/$/, '');
 }
 
 function getApiPrefix(): string {
-  const rawPrefix = process.env.NEXT_PUBLIC_API_PREFIX ?? '/api/cidr';
+  const rawPrefix = process.env.NEXT_PUBLIC_API_PREFIX ?? '/api/aegis/v1';
   const withLeadingSlash = rawPrefix.startsWith('/') ? rawPrefix : `/${rawPrefix}`;
   return withLeadingSlash.replace(/\/$/, '');
 }
@@ -273,11 +272,26 @@ function buildPaginationMeta(
   defaults: PaginationDefaults
 ): PaginationMeta {
   const rawMeta = isRecord(payload.meta) ? payload.meta : null;
-  const page = Number(rawMeta?.page ?? payload.page ?? defaults.page) || defaults.page;
-  const limit = Number(rawMeta?.limit ?? payload.limit ?? defaults.limit) || defaults.limit;
-  const total = Number(rawMeta?.total ?? payload.total ?? itemCount) || itemCount;
+  const page =
+    Number(
+      rawMeta?.page ??
+        payload.page ??
+        (payload.number !== undefined ? Number(payload.number) + 1 : undefined) ??
+        defaults.page
+    ) || defaults.page;
+  const limit =
+    Number(rawMeta?.limit ?? payload.limit ?? payload.size ?? defaults.limit) ||
+    defaults.limit;
+  const total =
+    Number(rawMeta?.total ?? payload.total ?? payload.totalElements ?? itemCount) ||
+    itemCount;
   const totalPages =
-    Number(rawMeta?.totalPages ?? payload.totalPages ?? Math.ceil(total / limit) ?? 1) || 1;
+    Number(
+      rawMeta?.totalPages ??
+        payload.totalPages ??
+        Math.ceil(total / limit) ??
+        1
+    ) || 1;
 
   return {
     page,
@@ -369,6 +383,7 @@ export function toPaginatedResponse<T>(
   }
 
   const itemsCandidate =
+    unwrapped.content ??
     unwrapped.items ??
     unwrapped.results ??
     unwrapped.records ??

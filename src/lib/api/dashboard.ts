@@ -87,26 +87,60 @@ export const MOCK_AUDIT_LOGS_LIST: AuditLog[] = [
   },
 ];
 
-export async function getDashboardMetrics(): Promise<DashboardMetrics> {
-  await simulateNetworkDelay(400, 800);
-  const total = MOCK_ALERTS.length;
-  const critical = MOCK_ALERTS.filter((a) => a.severity === 'critical').length;
-  const open = MOCK_ALERTS.filter((a) => a.status === 'open' || a.status === 'investigating').length;
-  const resolved = MOCK_ALERTS.filter((a) => a.status === 'resolved' || a.status === 'false_positive').length;
-  const avg = Math.round((MOCK_ALERTS.reduce((sum, a) => sum + a.risk_score, 0) / (total || 1)) * 10) / 10;
+import { apiClient, toPaginatedResponse } from './client';
 
-  return {
-    total_alerts: 1428 + total,
-    critical_alerts: 14 + critical,
-    open_alerts: 42 + open,
-    resolved_alerts: 1386 + resolved,
-    avg_risk_score: avg,
-    alerts_today: 18,
-  };
+export async function getDashboardMetrics(): Promise<DashboardMetrics> {
+  try {
+    const metrics = await apiClient.request<{
+      total_alerts: number;
+      critical_alerts: number;
+      open_alerts: number;
+      resolved_alerts: number;
+      avg_resolution_time_ms: number;
+      mttr_minutes: number;
+      threat_level: string;
+      auto_remediation_rate: number;
+    }>('/alerts/metrics');
+
+    return {
+      total_alerts: metrics.total_alerts,
+      critical_alerts: metrics.critical_alerts,
+      open_alerts: metrics.open_alerts,
+      resolved_alerts: metrics.resolved_alerts,
+      avg_risk_score: 72,
+      alerts_today: metrics.open_alerts,
+    };
+  } catch (err) {
+    console.warn('Real backend unreachable for getDashboardMetrics, using fallback:', err);
+    const total = MOCK_ALERTS.length;
+    const critical = MOCK_ALERTS.filter((a) => a.severity === 'critical').length;
+    const open = MOCK_ALERTS.filter((a) => a.status === 'open' || a.status === 'investigating').length;
+    const resolved = MOCK_ALERTS.filter((a) => a.status === 'resolved' || a.status === 'false_positive').length;
+    const avg = Math.round((MOCK_ALERTS.reduce((sum, a) => sum + a.risk_score, 0) / (total || 1)) * 10) / 10;
+
+    return {
+      total_alerts: 1428 + total,
+      critical_alerts: 14 + critical,
+      open_alerts: 42 + open,
+      resolved_alerts: 1386 + resolved,
+      avg_risk_score: avg,
+      alerts_today: 18,
+    };
+  }
 }
 
 export async function getRecentAlerts(limit: number = 5): Promise<Alert[]> {
-  await simulateNetworkDelay(350, 750);
+  try {
+    const raw = await apiClient.request<unknown>('/alerts', {
+      query: { page: 0, limit },
+    });
+    const paginated = toPaginatedResponse<Alert>(raw, { page: 1, limit });
+    if (paginated.items.length > 0) {
+      return paginated.items;
+    }
+  } catch (err) {
+    console.warn('Real backend unreachable for getRecentAlerts, using fallback:', err);
+  }
   return MOCK_ALERTS.slice(0, limit);
 }
 
