@@ -180,7 +180,7 @@ Create a `.env.local` file.
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
-NEXT_PUBLIC_API_PREFIX=/api/cidr
+NEXT_PUBLIC_API_PREFIX=/api/aegis/v1
 ```
 
 Backend API:

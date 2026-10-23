@@ -15,9 +15,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:3001
-ARG NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
-ARG NEXT_PUBLIC_API_PREFIX=/api/cidr
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG NEXT_PUBLIC_BACKEND_URL=http://localhost:8080
+ARG NEXT_PUBLIC_API_PREFIX=/api/aegis/v1
 ARG NEXT_PUBLIC_AUTH_REFRESH_PATH=/auth/refresh
 
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
@@ -36,9 +36,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_PUBLIC_API_URL=http://localhost:3001
-ENV NEXT_PUBLIC_BACKEND_URL=http://localhost:3001
-ENV NEXT_PUBLIC_API_PREFIX=/api/cidr
+ENV NEXT_PUBLIC_API_URL=http://localhost:8080
+ENV NEXT_PUBLIC_BACKEND_URL=http://localhost:8080
+ENV NEXT_PUBLIC_API_PREFIX=/api/aegis/v1
 ENV NEXT_PUBLIC_AUTH_REFRESH_PATH=/auth/refresh
 
 RUN addgroup --system --gid 1001 nodejs

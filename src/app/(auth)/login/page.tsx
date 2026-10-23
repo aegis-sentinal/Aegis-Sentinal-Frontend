@@ -36,7 +36,7 @@ export default function LoginPage() {
 
     if (!apiBase) return null;
 
-    return `${apiBase.replace(/\/$/, '')}/api/cidr/auth/${provider}`;
+    return `${apiBase.replace(/\/$/, '')}/api/aegis/v1/auth/${provider}`;
   };
 
   const {

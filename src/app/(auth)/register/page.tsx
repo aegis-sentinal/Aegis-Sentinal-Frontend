@@ -167,7 +167,7 @@ export default function RegisterPage() {
       process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
 
     if (!apiBase) return null;
-    return `${apiBase.replace(/\/$/, '')}/api/cidr/auth/${provider}`;
+    return `${apiBase.replace(/\/$/, '')}/api/aegis/v1/auth/${provider}`;
   };
 
   const {
