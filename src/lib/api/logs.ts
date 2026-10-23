@@ -29,6 +29,64 @@ export async function getLogs(params: LogsQueryParams = {}): Promise<PaginatedRe
   });
 
   return toPaginatedResponse<Log>(rawResponse, { page, limit });
-  await simulateNetworkDelay(400, 850);
-  return getMockPaginatedLogs(params);
 }
+
+export interface TelemetryAnalysisRequest {
+  log_content: string;
+  pipeline_type?: string;
+}
+
+export interface TelemetryAnalysisResponse {
+  verdict: 'CRITICAL' | 'HIGH' | 'SUSPICIOUS' | 'BENIGN';
+  fusedAnomalyScore: number;
+  confidencePercent: number;
+  mitreTactic: string;
+  mitreTechnique: string;
+  summary: string;
+  totalPipelineLatencyMs: number;
+  overallAccuracy: number;
+  overallPrecision: number;
+  overallRecall: number;
+  overallF1: number;
+  falsePositiveRate: number;
+  formatDetected: string;
+  aiProviderUsed?: string;
+  modelsUsed: Array<{
+    modelName: string;
+    category: string;
+    architecture: string;
+    inferenceLatencyMs: number;
+    accuracy: number;
+    precision: number;
+    recall: number;
+    f1Score: number;
+    anomalyScore: number;
+    fusionWeight: number;
+    contributionPercent: number;
+    detectionDetails: string;
+  }>;
+  matchedSigmaRules: Array<{
+    id: string;
+    title: string;
+    severity: string;
+    latencyMs: number;
+  }>;
+  extractedEntities: {
+    principal?: string;
+    sourceIp?: string;
+    targetResource?: string;
+    eventAction?: string;
+    geoCountry?: string;
+    anomalyIndicators: string[];
+  };
+}
+
+export async function analyzeTelemetryLog(
+  payload: TelemetryAnalysisRequest
+): Promise<TelemetryAnalysisResponse> {
+  return await apiClient.request<TelemetryAnalysisResponse>('/telemetry/analyze', {
+    method: 'POST',
+    body: payload,
+  });
+}
+

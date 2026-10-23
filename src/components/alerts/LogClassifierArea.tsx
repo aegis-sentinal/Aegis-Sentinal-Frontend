@@ -32,8 +32,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
 import { Alert } from '@/lib/types';
+import { analyzeTelemetryLog } from '@/lib/api/logs';
 
 // ─── Preset Sample Logs ──────────────────────────────────────────────────────
 export interface SampleLogPreset {
@@ -214,6 +214,8 @@ export interface PipelineExecutionResult {
     geoCountry?: string;
     anomalyIndicators: string[];
   };
+  formatDetected?: string;
+  aiProviderUsed?: string;
 }
 
 interface LogClassifierAreaProps {
@@ -234,12 +236,14 @@ export function LogClassifierArea({ onAlertGenerated, onNavigateToFeed }: LogCla
   const [progressPercent, setProgressPercent] = useState<number>(0);
   const [liveElapsedSec, setLiveElapsedSec] = useState<number>(0);
   const [currentStageMessage, setCurrentStageMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handlePresetSelect = (preset: SampleLogPreset) => {
     setActivePreset(preset.id);
     setLogText(preset.content);
     setResult(null);
+    setErrorMessage(null);
     setPushedToFeed(false);
   };
 
@@ -253,6 +257,7 @@ export function LogClassifierArea({ onAlertGenerated, onNavigateToFeed }: LogCla
       setLogText(content);
       setActivePreset('');
       setResult(null);
+      setErrorMessage(null);
       setPushedToFeed(false);
     };
     reader.readAsText(file);
@@ -269,64 +274,86 @@ export function LogClassifierArea({ onAlertGenerated, onNavigateToFeed }: LogCla
       setLogText(content);
       setActivePreset('');
       setResult(null);
+      setErrorMessage(null);
       setPushedToFeed(false);
     };
     reader.readAsText(file);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!logText.trim()) return;
-
-    // Pick a random time strictly between 5 and 15 seconds (5000ms to 15000ms)
-    const randomDurationMs = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000;
-    const durationSeconds = (randomDurationMs / 1000).toFixed(1);
 
     setIsAnalyzing(true);
     setAnalysisStep(1);
     setResult(null);
+    setErrorMessage(null);
     setPushedToFeed(false);
-    setProgressPercent(0);
+    setProgressPercent(15);
     setLiveElapsedSec(0);
     setCurrentStageMessage('Step 1/4: Ingesting & normalizing telemetry schema...');
 
-    // Multi-stage analysis animation simulating neural pipeline
-    setTimeout(() => {
-      setAnalysisStep(2);
-    }, 250);
     const startTime = Date.now();
-
-    setTimeout(() => {
-      setAnalysisStep(3);
-    }, 550);
     const ticker = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(99, Math.round((elapsed / randomDurationMs) * 100));
-      setProgressPercent(progress);
       setLiveElapsedSec(parseFloat((elapsed / 1000).toFixed(1)));
-
-      if (progress < 25) {
-        setAnalysisStep(1);
-        setCurrentStageMessage('Step 1/4: Ingesting & normalizing telemetry schema...');
-      } else if (progress < 50) {
-        setAnalysisStep(2);
-        setCurrentStageMessage('Step 2/4: Vectorizing tokens & generating contextual embeddings...');
-      } else if (progress < 80) {
-        setAnalysisStep(3);
-        setCurrentStageMessage('Step 3/4: Multi-model parallel inference across Helios workers...');
-      } else {
-        setAnalysisStep(4);
-        setCurrentStageMessage('Step 4/4: Synthesizing score fusion & evaluating 184 SIGMA rules...');
-      }
     }, 100);
 
-    setTimeout(() => {
-      setAnalysisStep(4);
-    }, 850);
-      clearInterval(ticker);
-      setProgressPercent(100);
-      setLiveElapsedSec(parseFloat(durationSeconds));
-      setAnalysisDurationSec(parseFloat(durationSeconds));
+    const step2Timer = setTimeout(() => {
+      setAnalysisStep(2);
+      setProgressPercent(45);
+      setCurrentStageMessage('Step 2/4: Vectorizing tokens & evaluating format schema...');
+    }, 350);
 
+    const step3Timer = setTimeout(() => {
+      setAnalysisStep(3);
+      setProgressPercent(75);
+      setCurrentStageMessage('Step 3/4: Multi-model inference across Helios neural workers...');
+    }, 750);
+
+    try {
+      const response = await analyzeTelemetryLog({
+        log_content: logText,
+        pipeline_type: selectedPipeline,
+      });
+
+      clearInterval(ticker);
+      clearTimeout(step2Timer);
+      clearTimeout(step3Timer);
+
+      setProgressPercent(100);
+      setAnalysisStep(4);
+      setCurrentStageMessage('Step 4/4: Synthesizing score fusion & evaluating 184 SIGMA rules...');
+
+      const durationSec = parseFloat(((Date.now() - startTime) / 1000).toFixed(1));
+      setAnalysisDurationSec(durationSec);
+      setResult(response as PipelineExecutionResult);
+    } catch (err: unknown) {
+      clearInterval(ticker);
+      clearTimeout(step2Timer);
+      clearTimeout(step3Timer);
+
+      let message = 'Unrecognized log format. The log could not be processed.';
+      if (err instanceof Error) {
+        message = err.message;
+      } else if (typeof err === 'object' && err !== null) {
+        const errorObj = err as Record<string, unknown>;
+        if (typeof errorObj.message === 'string') {
+          message = errorObj.message;
+        } else if (typeof errorObj.details === 'string') {
+          message = errorObj.details;
+        }
+      }
+      setErrorMessage(message);
+      setResult(null);
+    } finally {
+      setIsAnalyzing(false);
+      setAnalysisStep(0);
+    }
+  };
+
+  const _legacyMockAnalyze = () => {
+    const randomDurationMs = 5000;
+    const durationSeconds = "5.0";
     setTimeout(() => {
       // Determine classification outcome based on content heuristics or active preset
       const isBenign = logText.includes('prod-customer-alb') || (logText.includes('200') && !logText.includes('TorBrowser') && !logText.includes('Failed password') && !logText.includes('cluster-admin'));
@@ -1028,8 +1055,57 @@ export function LogClassifierArea({ onAlertGenerated, onNavigateToFeed }: LogCla
             </div>
           )}
 
+          {/* Format Validation Error State */}
+          {!isAnalyzing && errorMessage && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300 space-y-4">
+              <div className="flex items-start gap-3.5">
+                <div className="h-10 w-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-red-300 font-mono uppercase tracking-wider flex items-center gap-2">
+                      Telemetry Schema Validation Failed
+                    </h4>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-red-500/20 text-red-400 border border-red-500/30">
+                      HTTP 400 Bad Request
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed font-mono">
+                    {errorMessage}
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-red-500/20 grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] font-mono text-slate-400">
+                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-900 space-y-1.5">
+                  <span className="text-slate-200 font-bold flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> Supported JSON Schemas:
+                  </span>
+                  <ul className="list-disc list-inside space-y-1 text-slate-400 text-[10px]">
+                    <li>AWS CloudTrail (<span className="text-cyan-400">eventSource, eventName, userIdentity</span>)</li>
+                    <li>Kubernetes Audit (<span className="text-cyan-400">kind: Event, verb, objectRef</span>)</li>
+                    <li>AWS ALB Logs (<span className="text-cyan-400">elb, client_ip, request, elb_status_code</span>)</li>
+                    <li>Azure Activity (<span className="text-cyan-400">operationName, caller, resourceId</span>)</li>
+                    <li>GCP Cloud Audit (<span className="text-cyan-400">protoPayload, logName</span>)</li>
+                  </ul>
+                </div>
+                <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-900 space-y-1.5">
+                  <span className="text-slate-200 font-bold flex items-center gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> Supported Text Logs:
+                  </span>
+                  <ul className="list-disc list-inside space-y-1 text-slate-400 text-[10px]">
+                    <li>Linux Syslog / Auth (<span className="text-cyan-400">RFC 3164 / 5424</span> format)</li>
+                    <li>Format: <code className="text-amber-400">Mmm dd hh:mm:ss host service[pid]: message</code></li>
+                    <li>Example: <code className="text-slate-300">Mar 28 03:14:18 edge-01 sshd[14820]: Failed password...</code></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Empty Ready State before running */}
-          {!isAnalyzing && !result && (
+          {!isAnalyzing && !result && !errorMessage && (
             <div className="bg-slate-950/60 border border-slate-900 rounded-2xl p-8 text-center backdrop-blur-md flex flex-col items-center justify-center min-h-115 space-y-4">
               <div className="h-16 w-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
                 <Terminal size={32} />
@@ -1077,7 +1153,17 @@ export function LogClassifierArea({ onAlertGenerated, onNavigateToFeed }: LogCla
                     {result.verdict === 'BENIGN' && <ShieldCheck size={14} />}
                     VERDICT: {result.verdict}
                   </span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
+                    {result.formatDetected && (
+                      <span className="text-[10px] font-mono text-purple-300 font-bold bg-purple-950/60 border border-purple-500/30 px-2 py-0.5 rounded">
+                        Format: {result.formatDetected}
+                      </span>
+                    )}
+                    {result.aiProviderUsed && (
+                      <span className="text-[10px] font-mono text-cyan-300 font-bold bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Sparkles size={10} className="text-cyan-400" /> {result.aiProviderUsed}
+                      </span>
+                    )}
                     <span className="text-[10px] font-mono text-cyan-300 font-bold bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded">
                       Analyzed in {analysisDurationSec}s
                     </span>
