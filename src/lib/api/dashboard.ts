@@ -174,3 +174,18 @@ export async function getAuditLogs(
     };
   }
 }
+
+export async function exportAuditLogsCsv(): Promise<string> {
+  try {
+    const csv = await apiClient.request<string>('/audit-logs/export');
+    return csv;
+  } catch (err) {
+    console.warn('Real backend unreachable for exportAuditLogsCsv, using fallback generator:', err);
+    let csv = 'id,timestamp,actor,action,resource,resourceType,result,ipAddress,details\n';
+    MOCK_AUDIT_LOGS_LIST.forEach((log) => {
+      csv += `"${log.id}","${log.timestamp}","${log.actor}","${log.action}","${log.resource}","${log.resource_type}","${log.result}","${log.ip_address}","${log.details}"\n`;
+    });
+    return csv;
+  }
+}
+

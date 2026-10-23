@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatISOTimestamp } from '@/lib/utils';
 import { AuditResult } from '@/lib/types';
-import { getAuditLogs } from '@/lib/api/dashboard';
+import { getAuditLogs, exportAuditLogsCsv } from '@/lib/api/dashboard';
 import {
   Table,
   TableBody,
@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { TableSkeleton } from '@/components/layout/skeletons';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ShieldAlert, Download, RefreshCw } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -37,6 +37,27 @@ function ResultBadge({ result }: { result: AuditResult }) {
 
 export default function AuditLogsPage() {
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportCsv = async () => {
+    try {
+      setIsExporting(true);
+      const csvData = await exportAuditLogsCsv();
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `aegis-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export audit logs:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const {
     data: auditLogsData,
@@ -97,9 +118,24 @@ export default function AuditLogsPage() {
 
   return (
     <div className="space-y-6" data-testid="audit-logs-page">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-100 mb-2">Audit Logs</h1>
-        <p className="text-slate-400">Immutable record of all system activities for compliance</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-100 mb-2">Audit Logs</h1>
+          <p className="text-slate-400">Immutable record of all system activities for compliance</p>
+        </div>
+        <Button
+          onClick={handleExportCsv}
+          disabled={isExporting}
+          variant="outline"
+          className="border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-200 text-xs font-semibold flex items-center gap-2"
+        >
+          {isExporting ? (
+            <RefreshCw size={14} className="animate-spin text-cyan-400" />
+          ) : (
+            <Download size={14} className="text-cyan-400" />
+          )}
+          Export CSV (SOC 2)
+        </Button>
       </div>
 
       {/* Table */}
