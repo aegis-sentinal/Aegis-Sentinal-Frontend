@@ -22,16 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-interface ThreatFeedItem {
-  id: number;
-  type: string;
-  indicator: string;
-  threat: string;
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-  country: string;
-  timestamp: string;
-  mitreTech: string;
-}
+import { getThreatFeed, lookupIndicator, ThreatFeedItem } from '@/lib/api/intelligence';
 
 const mockThreatFeed: ThreatFeedItem[] = [
   { id: 1, type: 'IP Reputation', indicator: '198.51.100.42', threat: 'Known Tor Exit Node / Botnet Command Server', severity: 'HIGH', country: 'RU', timestamp: '2 mins ago', mitreTech: 'T1078' },
@@ -60,7 +51,6 @@ const mitreTechniques = [
   { code: 'T1498', name: 'Network Denial of Service', category: 'Impact', threatCount: 22 },
 ];
 
-import { getThreatFeed, lookupIndicator, ThreatFeedItem } from '@/lib/api/intelligence';
 
 export default function WatchtowerPage() {
   const [searchQuery, setSearchQuery] = useState('');

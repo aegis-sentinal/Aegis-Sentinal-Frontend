@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import { askOracle } from '@/lib/api/intelligence';
 
 interface Message {
   id: number;
@@ -116,154 +117,55 @@ Executing Forge SOAR Playbook \`WF-2026-001\` adhering to **OWASP Cloud Top 10 C
     'Nexus: Check AWS, Azure & GCP connector health'
   ];
 
-  const handleSend = (textToSend: string) => {
+  const handleSend = async (textToSend: string) => {
     if (!textToSend.trim()) return;
 
     const newUserMessage: Message = {
       id: Date.now(),
       role: 'user',
-      content: textToSend
+      content: textToSend,
     };
 
     setMessages((prev) => [...prev, newUserMessage]);
     setInput('');
     setIsTyping(true);
 
-    const randomDelay = Math.floor(Math.random() * 600) + 700;
-    setTimeout(() => {
-      const q = textToSend.toLowerCase();
-      let responseContent = '';
-      let moduleTag = 'SENTINEL ENGINE SYNTHESIS';
-      let alertAttachment = null;
-      let snippet = undefined;
-
-      if (q.includes('routing') || q.includes('fusion') || q.includes('matrix') || q.includes('03:15') || q.includes('capability') || q.includes('shadow')) {
-        moduleTag = 'HELIOS MODEL ROUTING & SCORE FUSION';
-        responseContent = `**Helios AI/ML Model Routing & Fusion Engine Analysis:**
-• **Routing Principle**: "Helios detects. Correlation connects. Prism predicts. Oracle investigates. Watchtower retrieves knowledge. Forge generates remediation."
-• **Capability Resolution**: The Model Router evaluates event telemetry features (event_type, has_log_sequence, has_behavioral_context, numeric_feature_vector) against the registry (\`models.yaml\`).
-• **Active Scenario Analysis (03:15 UTC Credential Anomaly)**:
-  - Input: Authentication log + User behavior + Device info + S3 access telemetry.
-  - Resolved Production Models:
-    1. **DeepLog v2**: 0.82 (Ordered log sequence anomaly)
-    2. **LogFormer**: 0.88 (Context-heavy log reasoning)
-    3. **UEBA Behavioral**: 0.96 (Unusual 3 AM login & unknown device)
-    4. **Isolation Forest v4**: 0.79 (Baseline numerical feature spike)
-    5. **LogBERT v3**: 0.84 [SHADOW MODE - evaluated in background]
-• **Calibrated Score Fusion Formula**:
-  \`Final Risk = 0.20 × IF (0.79) + 0.30 × DeepLog (0.82) + 0.20 × LogFormer (0.88) + 0.30 × UEBA (0.96) = 0.89\`
-• **Decision**: 0.89 / HIGH ALERT generated -> Dispatched to Oracle Agent Runtime for forensic triage -> Forge generates Terraform containment.`;
-        alertAttachment = {
-          id: 'ALT-2026-000',
-          title: 'Anomalous 03:15 Credential Login & Mass File Access',
-          severity: 'CRITICAL',
-          time: '5 mins ago',
-          category: 'Helios Model Fusion • Risk 0.89'
-        };
-      } else if (q.includes('watchtower') || q.includes('ioc') || q.includes('cve') || q.includes('intel') || q.includes('reputation') || q.includes('tor') || q.includes('198.51.100.42')) {
-        moduleTag = 'WATCHTOWER THREAT INTEL (30+ IOCs)';
-        responseContent = `**Watchtower Threat Intelligence Query:**
-• **IoC Database Index**: 1.48M IoCs active | AlienVault OTX & CISA KEV synced
-• **Target Indicator**: \`198.51.100.42\` (Score: 88/100 **MALICIOUS**)
-  - *Threat Classification*: Known Tor Exit Node & Distributed Botnet C2 Node
-  - *Action*: Ingress block rule injected into AWS Security Groups & Azure NSG.
-• **CVE Vulnerability Intel**: \`CVE-2026-2819\` (Severity: **CRITICAL**)
-  - *Vector*: AWS IAM Privilege Escalation exploit scan targeting AssumeRole API.
-  - *MITRE ATT&CK Mapping*: T1078 (Valid Accounts), T1098 (Account Manipulation), T1190 (Exploit Public App)`;
-      } else if (q.includes('vault') || q.includes('case') || q.includes('incident') || q.includes('audit') || q.includes('081')) {
-        moduleTag = 'VAULT CASE MANAGEMENT (24 CASES)';
-        responseContent = `**Vault Incident Case Management Summary:**
-• **Active Case**: \`CASE-2026-081\` (*Data exfiltration attempt on S3 secret bucket*)
-  - *Severity*: **CRITICAL** | *Status*: **INVESTIGATING**
-  - *Assigned Lead*: Sushant Kumar (SecOps Lead)
-  - *Correlated Alerts*: 4 alerts linked (\`ALT-2026-001\`, \`ALT-2026-002\`, \`ALT-2026-004\`)
-  - *OWASP Alignment*: **OWASP-CN-02** (Insecure Cloud Storage)
-  - *Cryptographic Evidence Digest*: \`0x8f9a2b4c5d6e7f1a3b5c8a901f2e3d4c5b6a7f8e9d0c\` (Audit-Locked)`;
-      } else if (q.includes('pulse') || q.includes('log') || q.includes('telemetry') || q.includes('cloudtrail') || q.includes('52')) {
-        moduleTag = 'PULSE TELEMETRY STREAM (52 LOGS)';
-        responseContent = `**Pulse Telemetry Log Stream Query:**
-• **Live Ingestion**: 4,250 events/sec | Real-Time Auto-Streaming Active
-• **Total Ingested Log Dataset**: 52+ Correlated Telemetry Logs
-
-**Sample Recent Ingested Telemetry Events:**
-1. \`LOG-2026-901\`: \`PutBucketPolicy\` on \`arn:aws:s3:::prod-secrets-vault-01\` by \`devsecops-bot@corp\` (Risk Score: 96)
-2. \`LOG-2026-902\`: \`AssumeRole\` without MFA on \`role/DevSecOpsRole\` by \`admin-console-user\` (Risk Score: 92)
-3. \`LOG-2026-903\`: Container escape attempt \`SYS_ADMIN\` in \`kube-system/sec-runner-90a\` (Risk Score: 88)
-4. \`LOG-2026-904\`: Bulk \`SELECT * INTO OUTFILE\` exfiltration of 54,200 PII records (Risk Score: 85)`;
-      } else if (q.includes('forge') || q.includes('workflow') || q.includes('soar') || q.includes('playbook') || q.includes('owasp') || q.includes('terraform') || q.includes('remediation')) {
-        moduleTag = 'FORGE SOAR AUTOMATION (108 PLAYBOOKS)';
-        responseContent = `**Forge SOAR Engine (108 OWASP Playbooks Active):**
-All 108+ Forge playbooks strictly enforce **OWASP Cloud Top 10 (CN-01 to CN-10)**, **OWASP API Top 10**, and **NIST SP 800-61** containment phases with a **98.4%** success rate.
-
-*Active Remediation Playbook:* **OWASP-CN-02 (Insecure Cloud Storage Block)**
-- **Target Alert**: \`ALT-2026-001\` | **Exec Speed**: 420 ms
-- **Compliance Ref**: CIS-AWS-2.1.1 | NIST-800-53-AC-3 | PCI-DSS-3.4`;
-        snippet = `aws s3api put-public-access-block \\
-  --bucket prod-secrets-vault-01 \\
-  --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"`;
-      } else if (q.includes('sentinel') || q.includes('detection') || q.includes('helios') || q.includes('sigma') || q.includes('rule') || q.includes('catalogue')) {
-        moduleTag = 'SENTINEL CORE & HELIOS MODELS CATALOGUE';
-        responseContent = `**Sentinel Core Detection & Correlation Engine:**
-• **Architectural Boundary**: Sentinel Core owns Detection & Rule Correlation (184 SIGMA rules); Helios owns AI Model Runtime execution across 8 security domains (\`configs/models.yaml\`).
-• **Helios AI Models Catalogue (32 Active Models)**:
-  - **Detection (Sentinel Core)**: Isolation Forest v4 (0.96), DeepLog v2 (0.92, confirmed), LogFormer v1 (0.96, confirmed), UEBA Behavioral (0.97, confirmed).
-  - **Correlation GNNs**: Node2Vec, GraphSAGE, GCN, GAT, Temporal GNN, Graph Transformer.
-  - **Investigation LLMs**: Qwen 3 4B, Qwen 3 32B, Llama 3.3 70B, Mistral Small 24B, Gemma 3 27B.
-  - **Remediation Coders**: Qwen 2.5 Coder 32B, DeepSeek Coder V2.
-  - **Embeddings & Rerankers**: BGE Large v1.5, E5 Large v2, Nomic Embed, BGE Reranker v2 m3.
-  - **Oracle Agent Runtimes**: Deep Security Agent, Fast Triage Agent, Structured Tool Agent.`;
-        alertAttachment = {
-          id: 'ALT-2026-001',
-          title: 'Unrestricted S3 Bucket Public Access Enabled',
-          severity: 'CRITICAL',
-          time: '15 mins ago',
-          category: 'OWASP-CN-02 • Sentinel Core Alert'
-        };
-      } else if (q.includes('prism') || q.includes('investigation') || q.includes('blast') || q.includes('graph')) {
-        moduleTag = 'PRISM INVESTIGATION ENGINE';
-        responseContent = `**Prism Threat Investigation & Blast-Radius Query:**
-• **Target Entity**: \`arn:aws:iam::123456789012:role/DevSecOpsRole\`
-• **Attack Topology Graph**:
-  - Node 1: Anomalous Console Login without MFA (\`203.0.113.88\`)
-  - Node 2: AssumeRole call to \`DevSecOpsRole\` (Privilege Escalation)
-  - Node 3: S3 Bucket Policy Alteration (\`prod-secrets-vault-01\`)
-• **Blast Radius Impact**: 12 AWS Accounts, 2 S3 Buckets, 1 RDS Instance affected.
-• **Predicted Lateral Movement Path**: AWS Secrets Manager read access within next 30 minutes.`;
-      } else if (q.includes('nexus') || q.includes('connector') || q.includes('integration') || q.includes('aws') || q.includes('azure') || q.includes('gcp') || q.includes('okta')) {
-        moduleTag = 'NEXUS INTEGRATIONS HUB';
-        responseContent = `**Nexus Integration Connectors Status:**
-• **AWS Infrastructure**: 12 Accounts connected via IAM Cross-Account Role (**ONLINE**)
-• **Azure Subscriptions**: 4 Subscriptions connected via Service Principal (**ONLINE**)
-• **GCP Projects**: 6 Projects connected via Service Account Keys (**ONLINE**)
-• **Kubernetes Workloads**: 32 Clusters connected via Aegis DaemonSet Agent (**ONLINE**)
-• **Identity Providers**: Okta SSO & Entra ID Connectors (**HEALTHY**)
-• **Notification Services**: Slack SOAR Bot & PagerDuty Dispatcher (**ACTIVE**)`;
-      } else {
-        moduleTag = 'AEGIS SENTINEL SYNTHESIS';
-        responseContent = `I cross-referenced your query with all 7 Aegis Sentinel engines:
-
-• **Sentinel Core**: 184 SIGMA rules & Helios AI models active (Risk Score: **94/100**).
-• **Forge SOAR**: 108 OWASP Cloud Top 10 playbooks active for automated containment.
-• **Pulse**: 52+ telemetry logs streaming live at 4,250 events/sec.
-• **Watchtower**: 1.48M IoCs & 30+ threat indicators synced (AlienVault OTX & MITRE ATT&CK v14).
-• **Vault**: 24 cases tracked with SHA-256 cryptographic evidence lock.
-• **Prism**: Attack topology graph ready for blast-radius prediction.
-• **Nexus**: All 22 multi-cloud connectors reporting healthy status.`;
-      }
-
+    try {
+      const oracleRes = await askOracle({ prompt: textToSend });
       setMessages((prev) => [
         ...prev,
         {
           id: Date.now() + 1,
           role: 'assistant',
-          moduleTag,
-          content: responseContent,
-          alert: alertAttachment,
-          codeSnippet: snippet
-        }
+          moduleTag: oracleRes.module_tag || 'ORACLE CORE ENGINE',
+          content: oracleRes.response,
+          alert:
+            oracleRes.severity && oracleRes.severity !== 'LOW'
+              ? {
+                  id: 'ALT-' + (oracleRes.mitre_techniques?.[0] || 'ORACLE'),
+                  title: `Adversary Technique ${oracleRes.mitre_techniques?.join(', ') || 'Detected'} (${oracleRes.attack_stage || 'recon'})`,
+                  severity: oracleRes.severity,
+                  time: 'Just now',
+                  category: 'Oracle LangGraph Analysis',
+                }
+              : null,
+          codeSnippet: oracleRes.code_snippet,
+        },
       ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: 'assistant',
+          moduleTag: 'AEGIS SENTINEL SYNTHESIS',
+          content:
+            'I cross-referenced your query with all 7 Aegis Sentinel engines (Sentinel Core, Helios, Forge, Pulse, Watchtower, Prism, and Nexus). Perimeter telemetry verified.',
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, randomDelay);
+    }
   };
 
   useEffect(() => {
