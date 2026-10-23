@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
   FolderLock, 
@@ -33,6 +33,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { getIncidents, Incident } from '@/lib/api/incidents';
 
 interface CaseItem {
   id: string;
@@ -75,6 +76,54 @@ export default function VaultPage() {
   const [selectedCase, setSelectedCase] = useState<CaseItem | null>(null);
   const [caseList, setCaseList] = useState<CaseItem[]>(mockCases);
   const [assignMessage, setAssignMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getIncidents({ limit: 20 })
+      .then((res) => {
+        if (!mounted || !res.data || res.data.length === 0) return;
+        const mapped: CaseItem[] = res.data.map((inc) => {
+          const sev = (inc.severity ? inc.severity.toUpperCase() : 'MEDIUM') as CaseItem['severity'];
+          let st: CaseItem['status'] = 'OPEN';
+          if (inc.status === 'investigating' || inc.status === 'escalated') st = 'INVESTIGATING';
+          else if (inc.status === 'remediation_pending') st = 'TRIAGED';
+          else if (inc.status === 'resolved' || inc.status === 'closed') st = 'RESOLVED';
+
+          let cp: CaseItem['cloudProvider'] = 'AWS';
+          const p = (inc.cloud_provider || '').toLowerCase();
+          if (p.includes('azure')) cp = 'Azure';
+          else if (p.includes('gcp') || p.includes('google')) cp = 'GCP';
+          else if (p.includes('k8s') || p.includes('kube')) cp = 'Kubernetes';
+          else if (p.includes('entra') || p.includes('auth') || p.includes('id')) cp = 'Entra ID';
+
+          const shortId = inc.id.length > 12 ? inc.id.substring(0, 12) : inc.id;
+          return {
+            id: `CASE-${shortId.toUpperCase()}`,
+            title: inc.title,
+            severity: sev,
+            status: st,
+            assignee: 'Sushant Kumar',
+            created: 'Recently active',
+            alerts: inc.alert_count || 1,
+            cloudProvider: cp,
+            owaspCode: 'OWASP-CN-02',
+            digestHash: `0x${inc.id.replace(/-/g, '').substring(0, 16)}`,
+          };
+        });
+
+        // Merge backend cases with mock cases, avoiding id duplicates
+        const existingIds = new Set(mapped.map((m) => m.id));
+        const filteredMock = mockCases.filter((mc) => !existingIds.has(mc.id));
+        setCaseList([...mapped, ...filteredMock]);
+      })
+      .catch((err) => {
+        console.warn('Could not load live incidents for Vault, keeping mock cases:', err);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {

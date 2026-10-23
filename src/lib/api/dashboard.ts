@@ -147,22 +147,30 @@ export async function getRecentAlerts(limit: number = 5): Promise<Alert[]> {
 export async function getAuditLogs(
   params: AuditLogsQueryParams = {}
 ): Promise<PaginatedResponse<AuditLog>> {
-  await simulateNetworkDelay(450, 900);
   const page = params.page ?? 1;
   const limit = params.limit ?? 50;
 
-  const start = (page - 1) * limit;
-  const items = MOCK_AUDIT_LOGS_LIST.slice(start, start + limit);
-  const total = MOCK_AUDIT_LOGS_LIST.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  try {
+    const raw = await apiClient.request<unknown>('/audit-logs', {
+      query: { page: page - 1, limit },
+    });
+    return toPaginatedResponse<AuditLog>(raw, { page, limit });
+  } catch (err) {
+    console.warn('Real backend unreachable for getAuditLogs, using fallback:', err);
+    await simulateNetworkDelay(200, 400);
+    const start = (page - 1) * limit;
+    const items = MOCK_AUDIT_LOGS_LIST.slice(start, start + limit);
+    const total = MOCK_AUDIT_LOGS_LIST.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
 
-  return {
-    items,
-    meta: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  };
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
 }
