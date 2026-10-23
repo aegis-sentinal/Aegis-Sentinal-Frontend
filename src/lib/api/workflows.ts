@@ -136,7 +136,7 @@ export async function executeWorkflow(payload: ExecuteWorkflowPayload): Promise<
     return {
       id: `wf-${Date.now()}`,
       alert_id: payload.alert_id || 'AL-DEMO',
-      type: 'containment',
+      type: 'auto_remediation',
       status: 'pending',
       executed_at: new Date().toISOString(),
       executed_by: 'SOC Analyst',
@@ -158,7 +158,7 @@ export async function approveWorkflow(workflowId: string, reason?: string): Prom
     return {
       id: workflowId,
       alert_id: 'AL-DEMO',
-      type: 'containment',
+      type: 'auto_remediation',
       status: 'executed',
       executed_at: new Date().toISOString(),
       executed_by: 'SOC Analyst',
@@ -180,7 +180,7 @@ export async function rejectWorkflow(workflowId: string, reason?: string): Promi
     return {
       id: workflowId,
       alert_id: 'AL-DEMO',
-      type: 'containment',
+      type: 'auto_remediation',
       status: 'failed',
       executed_at: new Date().toISOString(),
       executed_by: 'SOC Analyst',
@@ -201,7 +201,7 @@ export async function rollbackWorkflow(workflowId: string): Promise<Workflow> {
     return {
       id: workflowId,
       alert_id: 'AL-DEMO',
-      type: 'rollback',
+      type: 'auto_remediation',
       status: 'pending',
       executed_at: new Date().toISOString(),
       executed_by: 'SOC Analyst',
