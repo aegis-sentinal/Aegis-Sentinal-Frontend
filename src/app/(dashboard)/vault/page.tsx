@@ -81,8 +81,8 @@ export default function VaultPage() {
     let mounted = true;
     getIncidents({ limit: 20 })
       .then((res) => {
-        if (!mounted || !res.data || res.data.length === 0) return;
-        const mapped: CaseItem[] = res.data.map((inc) => {
+        if (!mounted || !res.items || res.items.length === 0) return;
+        const mapped: CaseItem[] = res.items.map((inc: Incident) => {
           const sev = (inc.severity ? inc.severity.toUpperCase() : 'MEDIUM') as CaseItem['severity'];
           let st: CaseItem['status'] = 'OPEN';
           if (inc.status === 'investigating' || inc.status === 'escalated') st = 'INVESTIGATING';
