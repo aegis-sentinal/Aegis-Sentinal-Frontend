@@ -132,24 +132,162 @@ export async function getMitreStatistics(): Promise<MitreStat[]> {
   ];
 }
 
-export async function askOracle(payload: OracleChatPayload): Promise<OracleChatResponse> {
+export function getGeminiApiKey(): string | null {
+  if (typeof window !== 'undefined') {
+    const customKey = localStorage.getItem('aegis_gemini_api_key');
+    if (customKey && customKey.trim()) {
+      return customKey.trim();
+    }
+  }
+  return process.env.NEXT_PUBLIC_GEMINI_API_KEY || null;
+}
+
+export function setGeminiApiKey(key: string): void {
+  if (typeof window !== 'undefined') {
+    if (key.trim()) {
+      localStorage.setItem('aegis_gemini_api_key', key.trim());
+    } else {
+      localStorage.removeItem('aegis_gemini_api_key');
+    }
+  }
+}
+
+export async function callGeminiOracle(payload: OracleChatPayload): Promise<OracleChatResponse> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error('Gemini API key is not configured');
+  }
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const systemInstruction = `You are Oracle, the AI Security Copilot of Aegis Sentinel (Enterprise Cloud Incident Detection and Response Platform).
+You synthesize 7 security engines:
+1. Sentinel Core (184 SIGMA detection rules, 35 Helios ML models)
+2. Forge SOAR (OWASP Cloud & API Top 10 automated remediation playbooks)
+3. Pulse (real-time telemetry stream at 4,250 events/sec)
+4. Watchtower (IoC threat intelligence, AlienVault OTX, MITRE ATT&CK v14)
+5. Prism (attack graph, blast radius, lateral movement)
+6. Nexus (22 multi-cloud connectors for AWS, Azure, GCP, K8s, Okta)
+7. Vault (cryptographic audit-ready incident cases)
+
+Respond with pure, valid JSON (no markdown formatting, no code blocks, no backticks) using this exact schema:
+{
+  "response": "Detailed analytical answer synthesizing relevant engines and findings",
+  "module_tag": "ENGINE NAME (e.g. SENTINEL CORE + FORGE SOAR)",
+  "severity": "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO",
+  "attack_stage": "initial_access" | "priv_esc" | "collection" | "exfiltration" | "impact" | "recon",
+  "mitre_techniques": ["T1078", "T1530"],
+  "recommended_actions": ["action 1", "action 2"],
+  "code_snippet": "CLI command or remediation code script (if relevant, else empty string)",
+  "escalate_to_human": boolean
+}`;
+
+  const promptText = `${systemInstruction}\n\nAnalyst Security Query:\n${payload.prompt}${payload.alert_id ? `\nAlert Context ID: ${payload.alert_id}` : ''}${payload.incident_id ? `\nIncident Context ID: ${payload.incident_id}` : ''}`;
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [{ text: promptText }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.2,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Gemini API returned status ${res.status}: ${errorBody}`);
+  }
+
+  const data = await res.json();
+  const rawText: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) {
+    throw new Error('No candidate content returned from Gemini API');
+  }
+
+  let cleanJson = rawText.trim();
+  if (cleanJson.startsWith('```json')) {
+    cleanJson = cleanJson.substring(7);
+  } else if (cleanJson.startsWith('```')) {
+    cleanJson = cleanJson.substring(3);
+  }
+  if (cleanJson.endsWith('```')) {
+    cleanJson = cleanJson.substring(0, cleanJson.length - 3);
+  }
+  cleanJson = cleanJson.trim();
+
   try {
-    return await apiClient.request<OracleChatResponse>('/oracle/chat', {
-      method: 'POST',
-      body: payload,
-    });
-  } catch (error) {
-    console.warn('[Oracle AI] Fallback response for prompt:', error);
-    await simulateNetworkDelay(400, 800);
+    const parsed = JSON.parse(cleanJson);
     return {
-      response: `Oracle Security Copilot: Analyzed request regarding "${payload.prompt}". All perimeter telemetry indicates normal baseline operation with active SIGMA validation.`,
-      module_tag: 'ORACLE CORE',
-      severity: 'LOW',
-      attack_stage: 'recon',
-      mitre_techniques: ['T1087'],
-      recommended_actions: ['monitor', 'collect_forensics'],
-      code_snippet: 'curl -X GET https://api.aegis-sentinel.io/v1/telemetry/health',
+      response: parsed.response || rawText,
+      module_tag: parsed.module_tag || 'ORACLE & SENTINEL CORE (GEMINI FLASH)',
+      severity: parsed.severity || 'HIGH',
+      attack_stage: parsed.attack_stage || 'recon',
+      mitre_techniques: Array.isArray(parsed.mitre_techniques) && parsed.mitre_techniques.length > 0
+        ? parsed.mitre_techniques
+        : ['T1078'],
+      recommended_actions: Array.isArray(parsed.recommended_actions) && parsed.recommended_actions.length > 0
+        ? parsed.recommended_actions
+        : ['monitor', 'collect_forensics'],
+      code_snippet: parsed.code_snippet || '',
+      escalate_to_human: Boolean(parsed.escalate_to_human),
+    };
+  } catch {
+    return {
+      response: rawText,
+      module_tag: 'ORACLE AI (GEMINI FLASH)',
+      severity: 'MEDIUM',
+      attack_stage: 'investigation',
+      mitre_techniques: ['T1078'],
+      recommended_actions: ['review_telemetry'],
+      code_snippet: '',
       escalate_to_human: false,
     };
   }
+}
+
+export async function askOracle(payload: OracleChatPayload): Promise<OracleChatResponse> {
+  const geminiKey = getGeminiApiKey();
+
+  // If Gemini API key is configured, query Gemini directly for live AI reasoning
+  if (geminiKey) {
+    try {
+      return await callGeminiOracle(payload);
+    } catch (geminiErr) {
+      console.warn('[Oracle AI] Gemini direct call failed, falling back to backend/synthesis:', geminiErr);
+    }
+  }
+
+  // Fallback to backend API if Gemini key is not set or failed
+  try {
+    const res = await apiClient.request<OracleChatResponse>('/oracle/chat', {
+      method: 'POST',
+      body: payload,
+    });
+    if (res && res.response) {
+      return res;
+    }
+  } catch (error) {
+    console.warn('[Oracle AI] Fallback response for prompt:', error);
+  }
+
+  await simulateNetworkDelay(400, 800);
+  return {
+    response: `Oracle Security Copilot: Analyzed request regarding "${payload.prompt}". All perimeter telemetry indicates normal baseline operation with active SIGMA validation.`,
+    module_tag: 'ORACLE CORE',
+    severity: 'LOW',
+    attack_stage: 'recon',
+    mitre_techniques: ['T1087'],
+    recommended_actions: ['monitor', 'collect_forensics'],
+    code_snippet: 'curl -X GET https://api.aegis-sentinel.io/v1/telemetry/health',
+    escalate_to_human: false,
+  };
 }

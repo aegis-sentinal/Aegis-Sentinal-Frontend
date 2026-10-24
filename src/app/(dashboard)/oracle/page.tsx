@@ -20,12 +20,13 @@ import {
   CheckCircle2,
   Code,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
-import { askOracle } from '@/lib/api/intelligence';
+import { askOracle, getGeminiApiKey, setGeminiApiKey } from '@/lib/api/intelligence';
 
 interface Message {
   id: number;
@@ -105,7 +106,24 @@ Executing Forge SOAR Playbook \`WF-2026-001\` adhering to **OWASP Cloud Top 10 C
 
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [showKeyConfig, setShowKeyConfig] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const key = getGeminiApiKey();
+    setHasGeminiKey(Boolean(key));
+    if (key) {
+      setApiKeyInput(key);
+    }
+  }, []);
+
+  const handleSaveApiKey = () => {
+    setGeminiApiKey(apiKeyInput);
+    setHasGeminiKey(Boolean(apiKeyInput.trim()));
+    setShowKeyConfig(false);
+  };
 
   const suggestionPills = [
     'Sentinel Core: Check Helios AI anomaly scores & SIGMA rules',
@@ -183,6 +201,15 @@ Executing Forge SOAR Playbook \`WF-2026-001\` adhering to **OWASP Cloud Top 10 C
           <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-semibold">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> CONNECTED TO ALL 7 MODULES
           </span>
+          {hasGeminiKey ? (
+            <span className="flex items-center gap-1 text-[10px] text-cyan-400 font-mono font-semibold bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+              <Sparkles className="h-2.5 w-2.5 animate-pulse" /> GEMINI FLASH ACTIVE
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-[10px] text-amber-400 font-mono font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+              HELIOS NEURAL ENGINE
+            </span>
+          )}
         </div>
         <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
           Oracle <Sparkles className="text-cyan-400 h-7 w-7" />
@@ -352,6 +379,58 @@ Executing Forge SOAR Playbook \`WF-2026-001\` adhering to **OWASP Cloud Top 10 C
               <CardTitle className="text-sm font-bold text-slate-300 uppercase tracking-wider">Oracle Agent Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">AI Reasoning Engine</span>
+                <span className="font-mono text-cyan-400 font-semibold flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  {hasGeminiKey ? 'Gemini Flash' : 'Helios Local'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-400">API Key Status</span>
+                <button
+                  type="button"
+                  onClick={() => setShowKeyConfig(!showKeyConfig)}
+                  className={`font-mono text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                    hasGeminiKey
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+                  }`}
+                >
+                  {hasGeminiKey ? 'KEY CONNECTED • EDIT' : 'CONFIGURE KEY'}
+                </button>
+              </div>
+              {showKeyConfig && (
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 mt-2">
+                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                    <Key className="h-3 w-3 text-cyan-400" /> Google Gemini API Key:
+                  </div>
+                  <Input
+                    type="password"
+                    placeholder="AQ.Ab8... or AIza..."
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    className="h-7 text-xs bg-slate-900 border-slate-800 text-slate-200"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowKeyConfig(false)}
+                      className="h-6 text-[10px] px-2 cursor-pointer"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveApiKey}
+                      className="h-6 text-[10px] px-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold cursor-pointer"
+                    >
+                      Save Key
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center text-xs">
                 <span className="text-slate-400">Context Window</span>
                 <span className="font-mono text-cyan-400 font-semibold">128k tokens</span>
