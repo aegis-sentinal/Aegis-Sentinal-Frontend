@@ -55,7 +55,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormValues) => {
     try {
       setServerError(null);
-      if (data.email.toLowerCase() === 'admin@aegissentinel.com' && data.password === 'AegisSentinel123!') {
+      if (data.email.toLowerCase() === 'admin.aegissentinel@gmail.com' && data.password === 'AegisSentinel123!') {
         // Bypass API checks for demo credentials
       } else {
         await loginUser(data);

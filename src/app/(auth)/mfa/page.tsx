@@ -40,9 +40,9 @@ function MfaVerifyContent() {
       return;
     }
 
-    // Support authenticator code '654321' as the demo bypass
-    if (code !== '654321') {
-      setError('Invalid verification code. Please enter the demo code: 654321');
+    // Support authenticator code
+    if (code !== '001653') {
+      setError('Invalid verification code.');
       return;
     }
 
